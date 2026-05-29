@@ -18,7 +18,7 @@
       <div v-if="!previewUrl" class="upload-content">
         <el-icon class="upload-icon"><UploadFilled /></el-icon>
         <div class="upload-text">点击或拖拽试卷图片到此区域</div>
-        <div class="upload-hint">支持 JPG、PNG 格式，建议 10MB 以内</div>
+        <div class="upload-hint">推荐使用扫描仪扫描；若用相机拍摄，请确保拍到试卷四条边、尽量正对减少倾斜</div>
       </div>
       <div v-else class="upload-preview">
         <img :src="previewUrl" alt="预览" class="preview-image" />

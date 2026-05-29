@@ -123,7 +123,7 @@
                   </div>
                 </div>
                 <div v-if="previewAnswers.length" class="preview-answers">
-                  <div class="preview-section-title" style="border-left-color: #409eff;">标准答案</div>
+                  <div class="preview-section-title" style="border-left-color: #409eff;">参考答案</div>
                   <div v-for="a in previewAnswers" :key="a.problem_key" class="preview-answer-item">
                     <span class="preview-problem-num">{{ a.problem_key }}</span>
                     <span>{{ a.correct_answer }}</span>
@@ -141,7 +141,7 @@
                    @change="handleMultiFileChange" />
             <el-icon class="upload-icon"><UploadFilled /></el-icon>
             <div class="upload-text">点击或拖拽学生答卷到此区域</div>
-            <div class="upload-hint">支持批量上传，每张图片将依次批改</div>
+            <div class="upload-hint">支持批量上传；推荐使用扫描仪，若用相机拍摄请确保拍到试卷四条边、减少倾斜</div>
           </div>
           <div v-if="studentFiles.length > 0" class="batch-file-list">
             <div v-for="(f, i) in studentFiles" :key="i" class="batch-file-item">
@@ -336,7 +336,7 @@
     </div>
 
     <!-- Answer editor dialog -->
-    <el-dialog v-model="answerEditorVisible" title="编辑标准答案" width="700px" :close-on-click-modal="false">
+    <el-dialog v-model="answerEditorVisible" title="编辑参考答案" width="700px" :close-on-click-modal="false">
       <input ref="answerImageInputRef" type="file" accept="image/*" style="display: none"
              @change="onAnswerImageSelect" />
 
@@ -357,12 +357,12 @@
       <!-- Answer list -->
       <div v-else>
         <div v-if="answerEditorEntries.length === 0" class="answer-editor-empty">
-          <p style="color: #909399; margin: 0 0 12px;">暂无标准答案，可通过以下方式添加：</p>
+          <p style="color: #909399; margin: 0 0 12px;">暂无参考答案，可通过以下方式添加：</p>
         </div>
         <div v-else style="max-height: 40vh; overflow-y: auto;">
           <div v-for="(entry, idx) in answerEditorEntries" :key="idx" class="answer-editor-row">
             <el-input v-model="entry.problem_key" placeholder="题号" size="small" style="width: 80px;" />
-            <el-input v-model="entry.correct_answer" placeholder="标准答案" size="small" style="flex: 1;" />
+            <el-input v-model="entry.correct_answer" placeholder="参考答案" size="small" style="flex: 1;" />
             <el-button text size="small" type="danger" @click="removeAnswerEntry(idx)">
               <el-icon><Delete /></el-icon>
             </el-button>
