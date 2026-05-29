@@ -142,12 +142,26 @@ const areaInfos = computed<AreaInfo[]>(() => {
     return result
   }
 
+  const titleToFirstIdx = new Map<string, number>()
+  analysis.sections.forEach((s, i) => {
+    if (!titleToFirstIdx.has(s.title || '')) titleToFirstIdx.set(s.title || '', i)
+  })
+
   for (const section of grading.sections) {
+    const origIdx = section._orig_section_idx
+    let si: number | undefined
+    if (origIdx != null && origIdx < analysis.sections.length) {
+      si = origIdx
+    } else {
+      si = titleToFirstIdx.get(section.title || '')
+    }
+    if (si == null) continue
+
+    const analysisSection = analysis.sections[si]
+    if (!analysisSection) continue
+
     for (const problem of section.problems) {
-      const si = section._orig_section_idx ?? (section.section_number - 1)
       const pi = problem.problem_number - 1
-      const analysisSection = analysis.sections[si]
-      if (!analysisSection) continue
       const analysisProblem = analysisSection.problems[pi]
       if (!analysisProblem) continue
 
