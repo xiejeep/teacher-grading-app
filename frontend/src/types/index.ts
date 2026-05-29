@@ -122,6 +122,8 @@ export interface GradingResult {
   sections: GradedSection[]
   total_score: number
   total_max_score: number
+  correct_count: number
+  total_areas: number
 }
 
 export interface GradingResponse {
@@ -143,6 +145,8 @@ export interface GradingHistoryItem {
   original_filename: string
   total_score: number | null
   total_max_score: number | null
+  correct_count: number | null
+  total_areas: number | null
   sections_count: number
   problems_count: number
   created_at: string
@@ -214,5 +218,7 @@ export interface BatchGradingSummaryItem {
   grading_id?: string
   score?: number
   max_score?: number
+  correct_count?: number
+  total_areas?: number
   error?: string
 }

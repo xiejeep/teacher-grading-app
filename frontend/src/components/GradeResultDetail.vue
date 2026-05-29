@@ -64,9 +64,9 @@
 
     <div style="margin-top: 16px; padding: 12px 16px; background: #f5f7fa; border-radius: 8px; text-align: center;">
       <span style="font-size: 16px; font-weight: 600;">
-        总分：
+        答对：
         <span :style="{ color: scorePercent >= 60 ? '#67C23A' : '#F56C6C' }">
-          {{ gradingResult.total_score }} / {{ gradingResult.total_max_score }}
+          {{ gradingResult.correct_count }} / {{ gradingResult.total_areas }} 个作答区
         </span>
       </span>
     </div>
@@ -86,8 +86,8 @@ const props = defineProps<{
 const activeSections = ref<number[]>([])
 
 const scorePercent = computed(() => {
-  if (!props.gradingResult.total_max_score) return 0
-  return Math.round((props.gradingResult.total_score / props.gradingResult.total_max_score) * 100)
+  if (!props.gradingResult.total_areas) return 0
+  return Math.round((props.gradingResult.correct_count / props.gradingResult.total_areas) * 100)
 })
 
 function getProblemText(sectionIdx: number, problemIdx: number): string {

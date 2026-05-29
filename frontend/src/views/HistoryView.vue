@@ -35,8 +35,8 @@
             <div class="card-meta">
               <span>{{ item.sections_count }} 大题</span>
               <span>{{ item.problems_count }} 小题</span>
-              <span v-if="item.total_score != null" class="score-text" :class="scoreClass(item)">
-                得分 {{ item.total_score }}/{{ item.total_max_score }}
+              <span v-if="item.correct_count != null && item.total_areas != null" class="score-text" :class="scoreClass(item)">
+                答对 {{ item.correct_count }}/{{ item.total_areas }}
               </span>
             </div>
             <div class="card-time">{{ formatTime(item.created_at) }}</div>
@@ -95,8 +95,8 @@ function formatTime(iso: string): string {
 }
 
 function scoreClass(item: GradingHistoryItem): string {
-  if (item.total_max_score == null || item.total_max_score === 0) return ''
-  const pct = item.total_score! / item.total_max_score
+  if (item.total_areas == null || item.total_areas === 0) return ''
+  const pct = item.correct_count! / item.total_areas
   return pct >= 0.6 ? 'score-good' : 'score-bad'
 }
 

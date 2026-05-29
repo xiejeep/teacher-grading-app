@@ -246,11 +246,12 @@
           <el-table :data="batchResults" stripe style="width: 100%; margin-top: 12px;" @row-click="viewBatchStudentDetail">
             <el-table-column prop="student_index" label="#" width="50" />
             <el-table-column prop="filename" label="文件名" min-width="150" />
-            <el-table-column label="得分" width="120">
+            <el-table-column label="答对/总作答区" width="140">
               <template #default="{ row }">
-                <span :style="{ color: row.grading_result ? (row.grading_result.total_score >= row.grading_result.total_max_score * 0.6 ? '#67c23a' : '#f56c6c') : '#909399' }">
-                  {{ row.grading_result ? row.grading_result.total_score + ' / ' + row.grading_result.total_max_score : '-' }}
+                <span v-if="row.grading_result && row.grading_result.total_areas != null" :style="{ color: (row.grading_result.total_areas > 0 && row.grading_result.correct_count / row.grading_result.total_areas >= 0.6) ? '#67c23a' : '#f56c6c' }">
+                  {{ row.grading_result.correct_count }} / {{ row.grading_result.total_areas }}
                 </span>
+                <span v-else style="color: #909399;">-</span>
               </template>
             </el-table-column>
             <el-table-column label="状态" width="100">

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, Union
 
 
@@ -109,6 +109,28 @@ class GradingResult(BaseModel):
     sections: list[GradedSection] = []
     total_score: float = 0.0
     total_max_score: float = 0.0
+    correct_count: int = 0
+    total_areas: int = 0
+
+    @model_validator(mode='after')
+    def compute_counts(self):
+        area_correct = 0
+        area_total = 0
+        total_score = 0.0
+        total_max_score = 0.0
+        for sec in self.sections:
+            for p in sec.problems:
+                total_score += p.problem_total_score
+                total_max_score += p.problem_max_score
+                for ag in p.area_gradings:
+                    area_total += 1
+                    if ag.is_correct is True:
+                        area_correct += 1
+        self.total_score = total_score
+        self.total_max_score = total_max_score
+        self.correct_count = area_correct
+        self.total_areas = area_total
+        return self
 
 
 class ExtractedAnswers(BaseModel):
@@ -144,6 +166,8 @@ class GradingHistoryItem(BaseModel):
     original_filename: str = ""
     total_score: Optional[float] = None
     total_max_score: Optional[float] = None
+    correct_count: Optional[int] = None
+    total_areas: Optional[int] = None
     sections_count: int = 0
     problems_count: int = 0
     created_at: str

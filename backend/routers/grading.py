@@ -413,12 +413,16 @@ def list_grading_history():
     for row in get_grading_history():
         total_score = None
         total_max = None
+        correct_count = None
+        total_areas = None
         sections_count = 0
         problems_count = 0
         if row.get("grading_result_json"):
             gr = json.loads(row["grading_result_json"])
             total_score = gr.get("total_score")
             total_max = gr.get("total_max_score")
+            correct_count = gr.get("correct_count")
+            total_areas = gr.get("total_areas")
             sections_count = len(gr.get("sections", []))
             problems_count = sum(len(s.get("problems", [])) for s in gr.get("sections", []))
 
@@ -430,6 +434,8 @@ def list_grading_history():
             original_filename=row.get("original_filename", ""),
             total_score=total_score,
             total_max_score=total_max,
+            correct_count=correct_count,
+            total_areas=total_areas,
             sections_count=sections_count,
             problems_count=problems_count,
             created_at=row["created_at"],
@@ -667,6 +673,8 @@ def _run_grade_with_template_pipeline(
 
             score = grading_result.get("total_score", 0) if grading_result else 0
             max_score = grading_result.get("total_max_score", 0) if grading_result else 0
+            correct = grading_result.get("correct_count", 0) if grading_result else 0
+            total_a = grading_result.get("total_areas", 0) if grading_result else 0
 
             queue.put_nowait(("grading_result", {
                 "student_index": student_index,
@@ -688,10 +696,12 @@ def _run_grade_with_template_pipeline(
                 "grading_id": grading_id,
                 "score": score,
                 "max_score": max_score,
+                "correct_count": correct,
+                "total_areas": total_a,
             })
 
             on_progress("student_done",
-                         f"第 {student_index}/{total} 份批改完成: {original_name} ({score}/{max_score})",
+                         f"第 {student_index}/{total} 份批改完成: {original_name} (答对 {correct}/{total_a})",
                          {"student_index": student_index, "total_students": total})
 
         queue.put_nowait(("done", {

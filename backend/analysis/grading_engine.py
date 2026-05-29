@@ -247,11 +247,22 @@ def call_ai_grade(image_path: str, layout: dict, grading_prompt: str,
     max_total = grading.get("total_max_score", 0)
     print(f"  总分: {total}/{max_total}")
 
+    area_correct = 0
+    area_total = 0
+    for sec in grading.get("sections", []):
+        for p in sec.get("problems", []):
+            for ag in p.get("area_gradings", []):
+                area_total += 1
+                if ag.get("is_correct") is True:
+                    area_correct += 1
+    grading["correct_count"] = area_correct
+    grading["total_areas"] = area_total
+
     if on_progress:
         sections_count = len(grading.get("sections", []))
         problems_count = sum(len(s.get("problems", [])) for s in grading.get("sections", []))
-        on_progress("grading_done", f"批改完成：{sections_count} 大题、{problems_count} 小题，总分 {total}/{max_total}",
-                    {"total_score": total, "total_max_score": max_total,
+        on_progress("grading_done", f"批改完成：{sections_count} 大题、{problems_count} 小题，答对 {area_correct}/{area_total} 个作答区",
+                    {"correct_count": area_correct, "total_areas": area_total,
                      "sections_count": sections_count, "problems_count": problems_count})
 
     return grading
@@ -280,11 +291,17 @@ def aggregate_batch_results(batch_results: list[dict], paper_info: dict) -> dict
     all_sections = []
     total_score = 0
     total_max_score = 0
+    area_correct = 0
+    area_total = 0
     for result in batch_results:
         for s in result.get("sections", []):
             for p in s.get("problems", []):
                 total_score += p.get("problem_total_score", 0) or 0
                 total_max_score += p.get("problem_max_score", 0) or 0
+                for ag in p.get("area_gradings", []):
+                    area_total += 1
+                    if ag.get("is_correct") is True:
+                        area_correct += 1
             all_sections.append(s)
     for i, s in enumerate(all_sections):
         s["section_number"] = i + 1
@@ -294,6 +311,8 @@ def aggregate_batch_results(batch_results: list[dict], paper_info: dict) -> dict
         "sections": all_sections,
         "total_score": total_score,
         "total_max_score": total_max_score,
+        "correct_count": area_correct,
+        "total_areas": area_total,
     }
 
 
@@ -447,14 +466,16 @@ def call_ai_grade_batched(image_path: str, layout: dict, grading_prompt: str,
     final_result = aggregate_batch_results(all_results, parent)
     total = final_result.get("total_score", 0)
     max_total = final_result.get("total_max_score", 0)
+    area_correct = final_result.get("correct_count", 0)
+    area_total = final_result.get("total_areas", 0)
     sec_count = len(final_result.get("sections", []))
     prob_count = sum(len(s.get("problems", [])) for s in final_result.get("sections", []))
 
     if on_progress:
         on_progress("grading_done",
-                    f"全部分批批改完成：{sec_count} 大题、{prob_count} 小题，总分 {total}/{max_total}",
-                    {"total_score": total, "total_max_score": max_total,
+                    f"全部分批批改完成：{sec_count} 大题、{prob_count} 小题，答对 {area_correct}/{area_total} 个作答区",
+                    {"correct_count": area_correct, "total_areas": area_total,
                      "sections_count": sec_count, "problems_count": prob_count})
 
-    print(f"  全部批改完成: {sec_count}大题 {prob_count}小题, 总分 {total}/{max_total}")
+    print(f"  全部批改完成: {sec_count}大题 {prob_count}小题, 答对 {area_correct}/{area_total} 个作答区")
     return final_result

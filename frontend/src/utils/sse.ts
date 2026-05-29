@@ -1,5 +1,5 @@
 export interface SSEHandlers {
-  onStatus?: (data: { phase: string; message: string; sections_count?: number; problems_count?: number; areas_count?: number; total_score?: number; total_max_score?: number; student_index?: number; total_students?: number }) => void
+  onStatus?: (data: { phase: string; message: string; sections_count?: number; problems_count?: number; areas_count?: number; total_score?: number; total_max_score?: number; correct_count?: number; total_areas?: number; student_index?: number; total_students?: number }) => void
   onAnalysisResult?: (data: { run_id: string; analysis_result: any; image_url?: string; image_width?: number; image_height?: number }) => void
   onGradingResult?: (data: { grading_id: string; run_id: string; grading_result: any; analysis_result: any; image_url?: string; image_width?: number; image_height?: number; student_index?: number; total_students?: number; filename?: string }) => void
   onTemplateCreated?: (data: { template_id: string; name: string; subject: string; stage: string; run_id: string; standard_answers: any[] }) => void
