@@ -67,6 +67,11 @@ export async function getGradingHistory(): Promise<GradingHistoryItem[]> {
   return data
 }
 
+export async function updateGradingResult(gradingId: string, gradingResult: any): Promise<GradingResponse> {
+  const { data } = await api.put<GradingResponse>(`/grade/${gradingId}`, { grading_result: gradingResult })
+  return data
+}
+
 export async function deleteGrading(gradingId: string): Promise<void> {
   await api.delete(`/grade/${gradingId}`)
 }

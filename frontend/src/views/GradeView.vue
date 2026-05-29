@@ -283,6 +283,7 @@
               <GradeResultDetail
                 v-if="batchDetailStudent.grading_result"
                 :grading-result="batchDetailStudent.grading_result"
+                :grading-id="batchDetailStudent.grading_id"
                 :analysis-result="batchDetailStudent.analysis_result"
               />
             </div>
@@ -320,6 +321,7 @@
               <GradeResultDetail
                 v-if="historyDetail.grading_result"
                 :grading-result="historyDetail.grading_result"
+                :grading-id="historyDetail.grading_id"
                 :analysis-result="historyDetail.analysis_result"
               />
               <div v-else class="empty-state" style="padding: 40px; text-align: center; color: #909399;">

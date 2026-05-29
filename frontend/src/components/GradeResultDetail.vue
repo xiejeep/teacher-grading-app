@@ -6,7 +6,7 @@
   <div v-else>
     <el-collapse v-model="activeSections" class="section-collapse">
       <el-collapse-item
-        v-for="(section, si) in gradingResult.sections"
+        v-for="(section, si) in displayResult.sections"
         :key="si"
         :name="si"
       >
@@ -57,6 +57,9 @@
                 <span class="ag-value" style="color: #909399;">{{ ag.comment }}</span>
               </div>
             </div>
+            <div class="ag-actions">
+              <el-button text size="small" type="primary" @click="openEditDialog(si, pi, ai)">修正</el-button>
+            </div>
           </div>
         </div>
       </el-collapse-item>
@@ -66,29 +69,173 @@
       <span style="font-size: 16px; font-weight: 600;">
         答对：
         <span :style="{ color: scorePercent >= 60 ? '#67C23A' : '#F56C6C' }">
-          {{ gradingResult.correct_count }} / {{ gradingResult.total_areas }} 个作答区
+          {{ displayResult.correct_count }} / {{ displayResult.total_areas }} 个作答区
         </span>
       </span>
     </div>
+
+    <el-dialog v-model="dialogVisible" title="修正作答区" width="480px" append-to-body>
+      <el-form v-if="editForm" label-position="top" size="small">
+        <el-form-item label="批改结果">
+          <el-radio-group v-model="editForm.is_correct">
+            <el-radio :value="true" style="color: #67C23A;">正确</el-radio>
+            <el-radio :value="false" style="color: #F56C6C;">错误</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="得分">
+              <el-input-number v-model="editForm.score" :min="0" :max="editForm.max_score" :precision="1" style="width: 100%;" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="满分">
+              <el-input-number v-model="editForm.max_score" :min="0" :precision="1" style="width: 100%;" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="学生答案">
+          <el-input v-model="editForm.student_answer" type="textarea" :rows="2" />
+        </el-form-item>
+        <el-form-item label="正确答案">
+          <el-input v-model="editForm.correct_answer" type="textarea" :rows="2" />
+        </el-form-item>
+        <el-form-item label="评语">
+          <el-input v-model="editForm.comment" type="textarea" :rows="2" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false" :disabled="saving">取消</el-button>
+        <el-button type="primary" @click="confirmEdit" :loading="saving">确认</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, reactive, watch } from 'vue'
 import { Document, CircleCheck, CircleClose, QuestionFilled } from '@element-plus/icons-vue'
-import type { GradingResult, AnalysisResponse, GradedProblem } from '@/types'
+import type { GradingResult, AnalysisResponse } from '@/types'
+import { updateGradingResult } from '@/api'
 
 const props = defineProps<{
   gradingResult: GradingResult
+  gradingId?: string
   analysisResult: AnalysisResponse | null
 }>()
 
+const emit = defineEmits<{
+  saved: [result: GradingResult]
+}>()
+
+function deepClone<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj))
+}
+
 const activeSections = ref<number[]>([])
+const saving = ref(false)
+
+const displayResult = reactive<GradingResult>(deepClone(props.gradingResult))
+
+watch(() => props.gradingResult, (val) => {
+  if (val && !saving.value) {
+    Object.assign(displayResult, deepClone(val))
+  }
+}, { deep: true })
 
 const scorePercent = computed(() => {
-  if (!props.gradingResult.total_areas) return 0
-  return Math.round((props.gradingResult.correct_count / props.gradingResult.total_areas) * 100)
+  if (!displayResult.total_areas) return 0
+  return Math.round((displayResult.correct_count / displayResult.total_areas) * 100)
 })
+
+const dialogVisible = ref(false)
+const editForm = ref<{
+  sectionIdx: number
+  problemIdx: number
+  areaIdx: number
+  is_correct: boolean | null
+  score: number
+  max_score: number
+  student_answer: string
+  correct_answer: string
+  comment: string
+} | null>(null)
+
+function openEditDialog(si: number, pi: number, ai: number) {
+  const ag = displayResult.sections[si].problems[pi].area_gradings[ai]
+  editForm.value = {
+    sectionIdx: si,
+    problemIdx: pi,
+    areaIdx: ai,
+    is_correct: ag.is_correct,
+    score: ag.score,
+    max_score: ag.max_score,
+    student_answer: ag.student_answer,
+    correct_answer: ag.correct_answer,
+    comment: ag.comment,
+  }
+  dialogVisible.value = true
+}
+
+function recalcProblem(si: number, pi: number) {
+  const problem = displayResult.sections[si].problems[pi]
+  let total = 0
+  let maxTotal = 0
+  for (const ag of problem.area_gradings) {
+    total += ag.max_score > 0 ? ag.score : 0
+    maxTotal += ag.max_score
+  }
+  problem.problem_total_score = total
+  problem.problem_max_score = maxTotal
+}
+
+function recalcAll() {
+  let totalScore = 0
+  let totalMax = 0
+  let correct = 0
+  let areas = 0
+  for (const sec of displayResult.sections) {
+    for (const p of sec.problems) {
+      totalScore += p.problem_total_score
+      totalMax += p.problem_max_score
+      for (const ag of p.area_gradings) {
+        areas += 1
+        if (ag.is_correct === true) correct += 1
+      }
+    }
+  }
+  displayResult.total_score = totalScore
+  displayResult.total_max_score = totalMax
+  displayResult.correct_count = correct
+  displayResult.total_areas = areas
+}
+
+async function confirmEdit() {
+  if (!editForm.value) return
+  if (!props.gradingId) {
+    console.warn('gradingId is missing, update will not be saved')
+    return
+  }
+  const { sectionIdx, problemIdx, areaIdx, ...fields } = editForm.value
+  const ag = displayResult.sections[sectionIdx].problems[problemIdx].area_gradings[areaIdx]
+  Object.assign(ag, fields)
+  recalcProblem(sectionIdx, problemIdx)
+  recalcAll()
+  dialogVisible.value = false
+
+  saving.value = true
+  try {
+    const resp = await updateGradingResult(props.gradingId, displayResult)
+    if (resp.grading_result) {
+      Object.assign(displayResult, deepClone(resp.grading_result))
+    }
+    emit('saved', displayResult)
+  } catch (e: any) {
+    console.error('保存失败:', e)
+  } finally {
+    saving.value = false
+  }
+}
 
 function getProblemText(sectionIdx: number, problemIdx: number): string {
   if (!props.analysisResult) return ''
@@ -191,5 +338,12 @@ function getProblemText(sectionIdx: number, problemIdx: number): string {
 .ag-value {
   font-size: 13px;
   color: #303133;
+}
+
+.ag-actions {
+  flex-shrink: 0;
+  align-self: center;
+  margin-left: auto;
+  padding-left: 8px;
 }
 </style>

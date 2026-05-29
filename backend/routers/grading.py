@@ -369,15 +369,11 @@ async def grade_existing(
     )
 
 
-@router.get("/grade/{grading_id}", response_model=GradingResponse)
-def get_grading_result(grading_id: str):
-    row = get_grading(grading_id)
-    if row is None:
-        raise HTTPException(404, "批改记录不存在")
-
+def build_grading_response(row: dict, grading_data: dict | None = None) -> GradingResponse:
     grading_result = None
-    if row.get("grading_result_json"):
-        grading_result = GradingResult(**json.loads(row["grading_result_json"]))
+    data = grading_data or (json.loads(row["grading_result_json"]) if row.get("grading_result_json") else None)
+    if data:
+        grading_result = GradingResult(**data)
 
     analysis_row = db_get_result(row["run_id"])
     analysis_result = None
@@ -405,6 +401,14 @@ def get_grading_result(grading_id: str):
         ) for a in standard_answers_data],
         created_at=row["created_at"],
     )
+
+
+@router.get("/grade/{grading_id}", response_model=GradingResponse)
+def get_grading_result(grading_id: str):
+    row = get_grading(grading_id)
+    if row is None:
+        raise HTTPException(404, "批改记录不存在")
+    return build_grading_response(row)
 
 
 @router.get("/grade", response_model=list[GradingHistoryItem])
@@ -441,6 +445,19 @@ def list_grading_history():
             created_at=row["created_at"],
         ))
     return items
+
+
+@router.put("/grade/{grading_id}", response_model=GradingResponse)
+def update_grading_result(grading_id: str, body: dict):
+    row = get_grading(grading_id)
+    if row is None:
+        raise HTTPException(404, "批改记录不存在")
+
+    grading_data = body.get("grading_result", body)
+    GradingResult(**grading_data)
+    save_grading_result(grading_id, grading_data)
+
+    return build_grading_response(row, grading_data)
 
 
 @router.delete("/grade/{grading_id}")
