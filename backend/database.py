@@ -372,7 +372,21 @@ def get_prompt_by_subject_stage(subject: str, stage: str) -> dict | None:
     ).fetchone()
     conn.close()
     if row is None:
-        return None
+        conn = get_db()
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            "INSERT OR REPLACE INTO prompts (subject, stage, analysis_prompt, grading_prompt, answer_extraction_prompt, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (subject, stage, DEFAULT_ANALYSIS_PROMPT, DEFAULT_GRADING_PROMPT, DEFAULT_EXTRACTION_PROMPT, now),
+        )
+        conn.commit()
+        conn.close()
+        return {
+            "subject": subject,
+            "stage": stage,
+            "analysis_prompt": DEFAULT_ANALYSIS_PROMPT,
+            "grading_prompt": DEFAULT_GRADING_PROMPT,
+            "answer_extraction_prompt": DEFAULT_EXTRACTION_PROMPT,
+        }
     return dict(row)
 
 
