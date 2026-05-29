@@ -25,6 +25,10 @@
             </span>
           </div>
         </el-radio>
+        <el-button class="template-delete-btn" text size="small" type="danger"
+                   @click.stop="handleDelete(tpl)">
+          <el-icon><Delete /></el-icon>
+        </el-button>
       </div>
     </el-radio-group>
 
@@ -96,8 +100,8 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
-import { Plus, Loading, Check, Close } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { Plus, Loading, Check, Close, Delete } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useTemplatesStore } from '@/stores/templates'
 import { connectCreateTemplateSSE } from '@/utils/sse'
 import type { SSEHandlers } from '@/utils/sse'
@@ -161,6 +165,22 @@ function parsedAnswerCount(jsonStr: string | null): number {
     return JSON.parse(jsonStr).length
   } catch {
     return 0
+  }
+}
+
+async function handleDelete(tpl: TemplateListItem) {
+  try {
+    await ElMessageBox.confirm(`确定删除模板「${tpl.name}」？删除后无法恢复。`, '删除模板', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+    const ok = await templatesStore.deleteTemplate(tpl.template_id)
+    if (ok && selectedId.value === tpl.template_id) {
+      selectedId.value = null
+    }
+  } catch {
+    // user cancelled
   }
 }
 
@@ -270,6 +290,8 @@ function resetCreateForm() {
 }
 
 .template-item {
+  display: flex;
+  align-items: center;
   padding: 8px 12px;
   border: 1px solid #e4e7ed;
   border-radius: 6px;
@@ -284,6 +306,16 @@ function resetCreateForm() {
 
 .template-item:hover {
   border-color: #c0c4cc;
+}
+
+.template-item:hover .template-delete-btn {
+  opacity: 1;
+}
+
+.template-delete-btn {
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
 }
 
 .template-item-content {
