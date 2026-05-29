@@ -289,6 +289,46 @@
         </div>
       </div>
 
+      <!-- ===== Phase history-detail ===== -->
+      <div v-if="phase === 'history-detail'">
+        <div v-if="historyLoading" style="text-align: center; padding: 60px; color: #909399;">
+          <el-icon class="is-loading" :size="32"><Loading /></el-icon>
+          <p style="margin-top: 12px;">加载批改记录...</p>
+        </div>
+        <div v-else-if="historyDetail" class="history-detail-area">
+          <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span style="font-weight: 600; font-size: 15px;">批改详情</span>
+              <el-tag size="small" style="margin-left: 8px;">{{ historyDetail.subject }}</el-tag>
+              <el-tag size="small" type="info" style="margin-left: 4px;">{{ historyDetail.stage }}</el-tag>
+            </div>
+            <el-button size="small" @click="resetAll">返回批改</el-button>
+          </div>
+          <div class="split-layout has-result">
+            <div class="grade-canvas-col">
+              <GradingCanvas
+                v-if="historyDetail.analysis_result"
+                :image-url="historyDetail.analysis_result?.original_image_url || ''"
+                :image-width="historyDetail.analysis_result?.image_width || 800"
+                :image-height="historyDetail.analysis_result?.image_height || 600"
+                :analysis-result="historyDetail.analysis_result"
+                :grading-result="historyDetail.grading_result"
+              />
+            </div>
+            <div class="grade-detail-col result-panel">
+              <GradeResultDetail
+                v-if="historyDetail.grading_result"
+                :grading-result="historyDetail.grading_result"
+                :analysis-result="historyDetail.analysis_result"
+              />
+              <div v-else class="empty-state" style="padding: 40px; text-align: center; color: #909399;">
+                <p>无批改结果数据</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <el-alert v-if="errorMsg" :title="errorMsg" type="error" show-icon style="margin-top: 16px;" closable @close="errorMsg = null" />
     </div>
 
@@ -372,6 +412,7 @@ import { connectGradeWithTemplateSSE, connectExtractAnswersSSE } from '@/utils/s
 import type { SSEHandlers } from '@/utils/sse'
 import { useTemplatesStore } from '@/stores/templates'
 import { useAnalysisStore } from '@/stores/analysis'
+import * as api from '@/api'
 import TemplateSelector from '@/components/TemplateSelector.vue'
 import GradingCanvas from '@/components/GradingCanvas.vue'
 import GradeResultDetail from '@/components/GradeResultDetail.vue'
@@ -399,10 +440,14 @@ const stage = ref(loadPersisted(STAGE_KEY, '小学'))
 watch(subject, (v) => persist(SUBJECT_KEY, v))
 watch(stage, (v) => persist(STAGE_KEY, v))
 
-type Phase = 'select-template' | 'upload-students' | 'edit-template' | 'batch-grading' | 'batch-result'
+type Phase = 'select-template' | 'upload-students' | 'edit-template' | 'batch-grading' | 'batch-result' | 'history-detail'
 const phase = ref<Phase>('select-template')
 
 const errorMsg = ref<string | null>(null)
+
+// History detail state
+const historyDetail = ref<any>(null)
+const historyLoading = ref(false)
 
 // Template state
 const selectedTemplateId = ref<string | null>(null)
@@ -862,13 +907,25 @@ function resetAll() {
   errorMsg.value = null
   showTemplatePreview.value = false
   templatePreviewData.value = null
+  historyDetail.value = null
+  historyLoading.value = false
   analysisStore.clearResult()
 }
 
 // ===== History loading from query param =====
 
 watch(() => route.query.grading_id, async (gid) => {
-  // no-op: history viewing handled by history page
+  if (!gid || typeof gid !== 'string') return
+  historyLoading.value = true
+  phase.value = 'history-detail'
+  try {
+    const resp = await api.getGradingResult(gid)
+    historyDetail.value = resp
+  } catch (e: any) {
+    errorMsg.value = e?.response?.data?.detail ?? e.message ?? '加载批改记录失败'
+  } finally {
+    historyLoading.value = false
+  }
 }, { immediate: true })
 
 onMounted(() => {
