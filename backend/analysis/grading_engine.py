@@ -2,10 +2,9 @@ import base64
 import json
 import sys
 
-import requests
 from PIL import Image
 
-from backend.config import API_URL, API_KEY, EP_ID
+from backend.providers import get_provider as _get_provider
 
 
 def call_ai_extract_answers(image_path: str, prompt_text: str,
@@ -13,59 +12,28 @@ def call_ai_extract_answers(image_path: str, prompt_text: str,
     if on_progress:
         on_progress("extracting", "正在从答案图片中提取参考答案...")
 
-    img = Image.open(image_path)
-    img_w, img_h = img.size
-    total_pixels = img_w * img_h
+    image_content = _get_provider().build_image_content(image_path)
+    user_content = [
+        {"type": "text", "text": "请提取这张答案图片中的所有参考答案信息。"},
+        image_content,
+    ]
 
-    with open(image_path, "rb") as f:
-        img_b64 = base64.b64encode(f.read()).decode()
+    resp = _get_provider().chat_completion(
+        system_prompt=prompt_text,
+        user_content=user_content,
+        max_tokens=16384,
+        response_format={"type": "json_object"},
+    )
 
-    payload = {
-        "model": EP_ID,
-        "thinking": {"type": "enabled"},
-        "response_format": {"type": "json_object"},
-        "max_tokens": 16384,
-        "temperature": 0,
-        "messages": [
-            {"role": "system", "content": prompt_text},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "请提取这张答案图片中的所有参考答案信息。"},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{img_b64}",
-                            "image_pixel_limit": {
-                                "min_pixels": int(total_pixels * 0.92),
-                                "max_pixels": int(total_pixels * 1.08),
-                            },
-                        },
-                    },
-                ],
-            },
-        ],
-    }
-
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json",
-    }
-
-    resp = requests.post(API_URL, json=payload, headers=headers, timeout=300)
-    resp.raise_for_status()
-    data = resp.json()
-
-    content = data["choices"][0]["message"]["content"]
     try:
-        result = json.loads(content)
+        result = json.loads(resp.content)
     except json.JSONDecodeError:
-        raise RuntimeError(f"答案提取 JSON 解析失败，原始返回前200字：{content[:200]}")
+        raise RuntimeError(f"答案提取 JSON 解析失败，原始返回前200字：{resp.content[:200]}")
 
     if "answers" not in result:
         result["answers"] = []
 
-    usage = data.get("usage", {})
+    usage = resp.usage
     print(f"  [答案提取] Token: in {usage.get('prompt_tokens', '?')}, out {usage.get('completion_tokens', '?')}")
 
     if on_progress:
@@ -100,37 +68,22 @@ def call_ai_extract_answers_from_text(answer_text: str, layout: dict,
         f"请提取所有参考答案，匹配到版面结构中的题目。"
     )
 
-    payload = {
-        "model": EP_ID,
-        "thinking": {"type": "enabled"},
-        "response_format": {"type": "json_object"},
-        "max_tokens": 16384,
-        "temperature": 0,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_text},
-        ],
-    }
+    resp = _get_provider().chat_completion(
+        system_prompt=system_prompt,
+        user_content=[{"type": "text", "text": user_text}],
+        max_tokens=16384,
+        response_format={"type": "json_object"},
+    )
 
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json",
-    }
-
-    resp = requests.post(API_URL, json=payload, headers=headers, timeout=300)
-    resp.raise_for_status()
-    data = resp.json()
-
-    content = data["choices"][0]["message"]["content"]
     try:
-        result = json.loads(content)
+        result = json.loads(resp.content)
     except json.JSONDecodeError:
-        raise RuntimeError(f"文本答案提取 JSON 解析失败，原始返回前200字：{content[:200]}")
+        raise RuntimeError(f"文本答案提取 JSON 解析失败，原始返回前200字：{resp.content[:200]}")
 
     if "answers" not in result:
         result["answers"] = []
 
-    usage = data.get("usage", {})
+    usage = resp.usage
     print(f"  [文本答案提取] Token: in {usage.get('prompt_tokens', '?')}, out {usage.get('completion_tokens', '?')}")
 
     if on_progress:
@@ -178,64 +131,37 @@ def call_ai_grade(image_path: str, layout: dict, grading_prompt: str,
     ]:
         system_prompt = system_prompt.replace(placeholder, value)
 
-    payload = {
-        "model": EP_ID,
-        "thinking": {"type": "enabled"},
-        "response_format": {"type": "json_object"},
-        "max_tokens": 32768,
-        "temperature": 0,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "请批改这张学生试卷，对照参考答案逐题判断对错，输出详细的批改结果 JSON。"},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{img_b64}",
-                            "image_pixel_limit": {
-                                "min_pixels": int(total_pixels * 0.92),
-                                "max_pixels": int(total_pixels * 1.08),
-                            },
-                        },
-                    },
-                ],
-            },
-        ],
-    }
-
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json",
-    }
+    image_content = _get_provider().build_image_content(image_path)
+    user_content = [
+        {"type": "text", "text": "请批改这张学生试卷，对照参考答案逐题判断对错，输出详细的批改结果 JSON。"},
+        image_content,
+    ]
 
     print(f"  正在调用 AI 批改（{img_w}×{img_h}）...")
-    resp = requests.post(API_URL, json=payload, headers=headers, timeout=300)
-    resp.raise_for_status()
-    data = resp.json()
+    resp = _get_provider().chat_completion(
+        system_prompt=system_prompt,
+        user_content=user_content,
+        max_tokens=32768,
+        response_format={"type": "json_object"},
+    )
 
     if on_progress:
         on_progress("grading", "AI 批改完成，正在解析结果...")
 
-    choice = data["choices"][0]
-    finish_reason = choice.get("finish_reason", "unknown")
-    content = choice["message"]["content"]
-
-    if finish_reason == "length":
+    if resp.finish_reason == "length":
         raise RuntimeError(
-            f"AI 批改输出被截断（finish_reason=length），已返回内容长度：{len(content)} 字符"
+            f"AI 批改输出被截断（finish_reason=length），已返回内容长度：{len(resp.content)} 字符"
         )
 
     try:
-        grading = json.loads(content)
+        grading = json.loads(resp.content)
     except json.JSONDecodeError:
-        raise RuntimeError(f"批改 JSON 解析失败（finish_reason={finish_reason}），原始返回前200字：{content[:200]}")
+        raise RuntimeError(f"批改 JSON 解析失败（finish_reason={resp.finish_reason}），原始返回前200字：{resp.content[:200]}")
 
     if "sections" not in grading:
         raise RuntimeError("AI 批改返回的 JSON 缺少 sections 字段")
 
-    usage = data.get("usage", {})
+    usage = resp.usage
     print(f"  [批改] Token: in {usage.get('prompt_tokens', '?')}, out {usage.get('completion_tokens', '?')}, total {usage.get('total_tokens', '?')}")
 
     for i, sec in enumerate(grading.get("sections", []), 1):
@@ -346,11 +272,6 @@ def call_ai_grade_batched(image_path: str, layout: dict, grading_prompt: str,
     all_results = []
     messages = [{"role": "system", "content": system_prompt}]
 
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json",
-    }
-
     for i, batch in enumerate(batches):
         batch_title = batch[0].get("title", f"第{i+1}批") if batch else f"第{i+1}批"
         total_batches = len(batches)
@@ -381,49 +302,29 @@ def call_ai_grade_batched(image_path: str, layout: dict, grading_prompt: str,
                 "role": "user",
                 "content": [
                     {"type": "text", "text": instructions},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{img_b64}",
-                            "image_pixel_limit": {
-                                "min_pixels": int(total_pixels * 0.92),
-                                "max_pixels": int(total_pixels * 1.08),
-                            },
-                        },
-                    },
+                    _get_provider().build_image_content(image_path),
                 ],
             })
         else:
             messages.append({"role": "user", "content": instructions})
 
-        payload = {
-            "model": EP_ID,
-            "thinking": {"type": "enabled"},
-            "response_format": {"type": "json_object"},
-            "max_tokens": 32768,
-            "temperature": 0,
-            "messages": messages,
-        }
-
         print(f"  正在调用 AI 批改 第{i+1}/{total_batches}批 ({batch_title}, {batch_problems}题)...")
-        resp = requests.post(API_URL, json=payload, headers=headers, timeout=300)
-        resp.raise_for_status()
-        data = resp.json()
+        resp = _get_provider().chat_completion_with_messages(
+            messages=messages,
+            max_tokens=32768,
+            response_format={"type": "json_object"},
+        )
 
-        choice = data["choices"][0]
-        finish_reason = choice.get("finish_reason", "unknown")
-        content = choice["message"]["content"]
-
-        if finish_reason == "length":
+        if resp.finish_reason == "length":
             raise RuntimeError(
-                f"AI 批改输出被截断（finish_reason=length），已返回内容长度：{len(content)} 字符"
+                f"AI 批改输出被截断（finish_reason=length），已返回内容长度：{len(resp.content)} 字符"
             )
 
         try:
-            result = json.loads(content)
+            result = json.loads(resp.content)
         except json.JSONDecodeError:
             raise RuntimeError(
-                f"批改 JSON 解析失败（finish_reason={finish_reason}），原始返回前200字：{content[:200]}")
+                f"批改 JSON 解析失败（finish_reason={resp.finish_reason}），原始返回前200字：{resp.content[:200]}")
 
         if "sections" not in result:
             raise RuntimeError("AI 批改返回的 JSON 缺少 sections 字段")
@@ -442,9 +343,9 @@ def call_ai_grade_batched(image_path: str, layout: dict, grading_prompt: str,
                         graded_problem["problem_number"] = batch_problems[pj]["problem_number"]
 
         all_results.append(result)
-        messages.append({"role": "assistant", "content": content})
+        messages.append({"role": "assistant", "content": resp.content})
 
-        usage = data.get("usage", {})
+        usage = resp.usage
         print(f"  [批改 第{i+1}批] Token: in {usage.get('prompt_tokens', '?')}, out {usage.get('completion_tokens', '?')}")
 
         if on_progress:

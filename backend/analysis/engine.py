@@ -1,11 +1,9 @@
 import base64
 import json
-import sys
 
-import requests
 from PIL import Image
 
-from backend.config import API_URL, API_KEY, EP_ID
+from backend.providers import get_provider as _get_provider
 
 
 RED = "#E53935"
@@ -89,64 +87,36 @@ def call_ai_analysis(image_path: str, prompt_text: str | None = None) -> dict:
 
     user_prompt = "请分析这张数学试卷图片的版面结构，按大题→小题→填空位置/作答区的层级输出归一化坐标 JSON。"
 
-    payload = {
-        "model": EP_ID,
-        "thinking": {"type": "enabled"},
-        "response_format": {"type": "json_object"},
-        "max_tokens": 32768,
-        "temperature": 0,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": user_prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{img_b64}",
-                            "image_pixel_limit": {
-                                "min_pixels": int(total_pixels * 0.92),
-                                "max_pixels": int(total_pixels * 1.08),
-                            },
-                        },
-                    },
-                ],
-            },
-        ],
-    }
+    image_content = _get_provider().build_image_content(image_path)
+    user_content = [
+        {"type": "text", "text": user_prompt},
+        image_content,
+    ]
 
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json",
-    }
+    resp = _get_provider().chat_completion(
+        system_prompt=system_prompt,
+        user_content=user_content,
+        max_tokens=32768,
+        response_format={"type": "json_object"},
+    )
 
-    resp = requests.post(API_URL, json=payload, headers=headers, timeout=300)
-    resp.raise_for_status()
-    data = resp.json()
-
-    choice = data["choices"][0]
-    finish_reason = choice.get("finish_reason", "unknown")
-    content = choice["message"]["content"]
-
-    if finish_reason == "length":
+    if resp.finish_reason == "length":
         raise RuntimeError(
             f"AI 输出被截断（finish_reason=length），请减少图片复杂度或稍后重试。"
-            f"已返回内容长度：{len(content)} 字符"
+            f"已返回内容长度：{len(resp.content)} 字符"
         )
 
     try:
-        layout = json.loads(content)
+        layout = json.loads(resp.content)
     except json.JSONDecodeError:
-        raise RuntimeError(f"JSON 解析失败（finish_reason={finish_reason}），原始返回前200字：{content[:200]}")
+        raise RuntimeError(f"JSON 解析失败（finish_reason={resp.finish_reason}），原始返回前200字：{resp.content[:200]}")
 
-    usage = data.get("usage", {})
+    usage = resp.usage
     print(f"  Token: in {usage.get('prompt_tokens', '?')}, "
           f"out {usage.get('completion_tokens', '?')}, "
           f"total {usage.get('total_tokens', '?')}")
-    print(f"  finish_reason: {finish_reason}")
+    print(f"  finish_reason: {resp.finish_reason}")
 
-    # 验证结构完整性
     if "sections" not in layout:
         raise RuntimeError("AI 返回的 JSON 缺少 sections 字段")
     if not layout["sections"]:
@@ -202,49 +172,30 @@ def call_ai_analysis_batched(image_path: str, prompt_text: str | None = None,
     with open(image_path, "rb") as f:
         img_b64 = base64.b64encode(f.read()).decode()
 
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json",
-    }
-
     # === Phase 1: Overview — identify paper info & section outlines ===
     if on_progress:
         on_progress("analyzing", "正在扫描试卷整体版面...")
 
     overview_system = OVERVIEW_PROMPT.format(img_w=img_w, img_h=img_h)
-    overview_messages = [
-        {"role": "system", "content": overview_system},
-        {"role": "user", "content": [
-            {"type": "text", "text": "请识别这张试卷的所有大题标题和区域范围，不要遗漏任何大题。"},
-            {"type": "image_url", "image_url": {
-                "url": f"data:image/jpeg;base64,{img_b64}",
-                "image_pixel_limit": {
-                    "min_pixels": int(total_pixels * 0.92),
-                    "max_pixels": int(total_pixels * 1.08),
-                },
-            }},
-        ]},
+    image_content = _get_provider().build_image_content(image_path)
+    overview_user_content = [
+        {"type": "text", "text": "请识别这张试卷的所有大题标题和区域范围，不要遗漏任何大题。"},
+        image_content,
     ]
 
-    payload = {
-        "model": EP_ID,
-        "thinking": {"type": "enabled"},
-        "response_format": {"type": "json_object"},
-        "max_tokens": 8192,
-        "temperature": 0,
-        "messages": overview_messages,
-    }
-
     print(f"  [版面分析-概览] 正在识别大题结构...")
-    resp = requests.post(API_URL, json=payload, headers=headers, timeout=120)
-    resp.raise_for_status()
-    data = resp.json()
+    resp = _get_provider().chat_completion(
+        system_prompt=overview_system,
+        user_content=overview_user_content,
+        max_tokens=8192,
+        response_format={"type": "json_object"},
+    )
 
-    overview = json.loads(data["choices"][0]["message"]["content"])
+    overview = json.loads(resp.content)
     sections_outline = overview.get("sections", [])
     paper_info = overview.get("paper_info", {})
 
-    usage = data.get("usage", {})
+    usage = resp.usage
     print(f"  [版面分析-概览] 识别到 {len(sections_outline)} 个大题, "
           f"in={usage.get('prompt_tokens','?')} out={usage.get('completion_tokens','?')}")
 
@@ -253,7 +204,7 @@ def call_ai_analysis_batched(image_path: str, prompt_text: str | None = None,
             on_progress("analyzing", "版面简单，使用单次分析模式...")
         return call_ai_analysis(image_path, prompt_text=prompt_text)
 
-    # === Phase 2: Per-section detailed analysis ===
+    # === Phase 2: Per-section detailed analysis (multi-turn) ===
     detail_system = prompt_text if prompt_text is not None else overview_system
     detail_system = detail_system.replace("{img_w}", str(img_w)).replace("{img_h}", str(img_h))
 
@@ -287,43 +238,27 @@ def call_ai_analysis_batched(image_path: str, prompt_text: str | None = None,
         if i == 0:
             messages.append({"role": "user", "content": [
                 {"type": "text", "text": instruction},
-                {"type": "image_url", "image_url": {
-                    "url": f"data:image/jpeg;base64,{img_b64}",
-                    "image_pixel_limit": {
-                        "min_pixels": int(total_pixels * 0.92),
-                        "max_pixels": int(total_pixels * 1.08),
-                    },
-                }},
+                _get_provider().build_image_content(image_path),
             ]})
         else:
             messages.append({"role": "user", "content": instruction})
 
-        payload = {
-            "model": EP_ID,
-            "thinking": {"type": "enabled"},
-            "response_format": {"type": "json_object"},
-            "max_tokens": 32768,
-            "temperature": 0,
-            "messages": messages,
-        }
-
         print(f"  [版面分析] 第{i+1}/{total}批 ({title})...")
-        resp = requests.post(API_URL, json=payload, headers=headers, timeout=300)
-        resp.raise_for_status()
-        data = resp.json()
+        resp = _get_provider().chat_completion_with_messages(
+            messages=messages,
+            max_tokens=32768,
+            response_format={"type": "json_object"},
+        )
 
-        content = data["choices"][0]["message"]["content"]
-        finish_reason = data["choices"][0].get("finish_reason", "unknown")
-
-        if finish_reason == "length":
+        if resp.finish_reason == "length":
             raise RuntimeError(
-                f"第{i+1}批 ({title}) 输出被截断（finish_reason=length），已返回 {len(content)} 字符")
+                f"第{i+1}批 ({title}) 输出被截断（finish_reason=length），已返回 {len(resp.content)} 字符")
 
         try:
-            detail = json.loads(content)
+            detail = json.loads(resp.content)
         except json.JSONDecodeError:
             raise RuntimeError(
-                f"第{i+1}批 ({title}) JSON 解析失败，前200字：{content[:200]}")
+                f"第{i+1}批 ({title}) JSON 解析失败，前200字：{resp.content[:200]}")
 
         detail_sections = detail.get("sections", [])
         for s in detail_sections:
@@ -332,9 +267,9 @@ def call_ai_analysis_batched(image_path: str, prompt_text: str | None = None,
                 problem["problem_number"] = pj + 1
             all_sections.append(s)
 
-        messages.append({"role": "assistant", "content": content})
+        messages.append({"role": "assistant", "content": resp.content})
 
-        usage = data.get("usage", {})
+        usage = resp.usage
         probs = sum(len(s.get("problems", [])) for s in detail_sections)
         print(f"  [版面分析] 第{i+1}批 ({title}): {len(detail_sections)}大题 {probs}题, "
               f"in={usage.get('prompt_tokens','?')} out={usage.get('completion_tokens','?')}")
@@ -346,7 +281,6 @@ def call_ai_analysis_batched(image_path: str, prompt_text: str | None = None,
                          "section_title": title,
                          "problems_count": probs})
 
-    # Aggregate
     for i, s in enumerate(all_sections):
         s["section_number"] = i + 1
 

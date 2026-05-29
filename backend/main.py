@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.config import UPLOAD_DIR, GRADING_UPLOAD_DIR, ANSWER_KEY_DIR
 from backend.database import init_db
-from backend.routers import analysis, history, grading, prompts, templates
+from backend.routers import analysis, history, grading, prompts, templates, settings
 
 app = FastAPI(title="试卷版面分析 API", version="1.0.0")
 
@@ -28,6 +28,7 @@ app.include_router(history.router, prefix="/api")
 app.include_router(grading.router, prefix="/api")
 app.include_router(prompts.router, prefix="/api")
 app.include_router(templates.router, prefix="/api")
+app.include_router(settings.router, prefix="/api")
 
 
 init_db()

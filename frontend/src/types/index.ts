@@ -198,6 +198,27 @@ export interface TemplateDetail {
   updated_at: string
 }
 
+export interface ProviderSettingsResponse {
+  ai_provider: string
+  volces_has_key: boolean
+  volces_ep_id: string
+  modelscope_has_key: boolean
+  modelscope_model: string
+}
+
+export interface ProviderSettingsPayload {
+  ai_provider: string
+  volces_api_key?: string
+  volces_ep_id?: string
+  modelscope_api_key?: string
+  modelscope_model?: string
+}
+
+export interface TestConnectionResult {
+  success: boolean
+  message: string
+}
+
 export interface StudentGradingResult {
   student_index: number
   total_students: number

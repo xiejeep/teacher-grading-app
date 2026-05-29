@@ -16,8 +16,12 @@
             <span>历史</span>
           </el-menu-item>
           <el-menu-item index="/prompts">
-            <el-icon><Setting /></el-icon>
+            <el-icon><Notebook /></el-icon>
             <span>提示词</span>
+          </el-menu-item>
+          <el-menu-item index="/settings">
+            <el-icon><Setting /></el-icon>
+            <span>设置</span>
           </el-menu-item>
         </el-menu>
       </el-header>
@@ -35,7 +39,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { Document, EditPen, Clock, Setting } from '@element-plus/icons-vue'
+import { Document, EditPen, Clock, Notebook, Setting } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const currentRoute = computed(() => route.path)

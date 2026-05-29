@@ -2,7 +2,8 @@ import axios from 'axios'
 import type {
   AnalysisResponse, HistoryItem, LayoutResult,
   GradingResponse, GradingHistoryItem, GradingResult,
-  PromptResponse, StandardAnswer
+  PromptResponse, StandardAnswer,
+  ProviderSettingsResponse, ProviderSettingsPayload, TestConnectionResult
 } from '@/types'
 
 const api = axios.create({
@@ -94,5 +95,20 @@ export async function updatePrompt(
   fields: { analysis_prompt?: string; grading_prompt?: string; answer_extraction_prompt?: string }
 ): Promise<PromptResponse> {
   const { data } = await api.put<PromptResponse>(`/prompts/${promptId}`, fields)
+  return data
+}
+
+export async function getProviderSettings(): Promise<ProviderSettingsResponse> {
+  const { data } = await api.get<ProviderSettingsResponse>('/settings/provider')
+  return data
+}
+
+export async function saveProviderSettings(settings: ProviderSettingsPayload): Promise<ProviderSettingsResponse> {
+  const { data } = await api.put<ProviderSettingsResponse>('/settings/provider', settings)
+  return data
+}
+
+export async function testProviderConnection(settings: ProviderSettingsPayload): Promise<TestConnectionResult> {
+  const { data } = await api.post<TestConnectionResult>('/settings/provider/test', settings)
   return data
 }

@@ -236,3 +236,19 @@ class TemplateCreate(BaseModel):
 class TemplateUpdate(BaseModel):
     name: Optional[str] = None
     standard_answers: Optional[list[StandardAnswer]] = None
+
+
+class ProviderSettings(BaseModel):
+    ai_provider: str = "volces"
+    volces_api_key: str = ""
+    volces_ep_id: str = ""
+    modelscope_api_key: str = ""
+    modelscope_model: str = "moonshotai/Kimi-K2.6"
+
+
+class ProviderSettingsResponse(BaseModel):
+    ai_provider: str
+    volces_has_key: bool
+    volces_ep_id: str
+    modelscope_has_key: bool
+    modelscope_model: str
