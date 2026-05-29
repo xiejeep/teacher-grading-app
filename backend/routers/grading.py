@@ -233,7 +233,7 @@ async def grade_analyze(
         try:
             standard_answers = json.loads(standard_answers_json)
         except json.JSONDecodeError:
-            raise HTTPException(400, "标准答案 JSON 格式错误")
+            raise HTTPException(400, "参考答案 JSON 格式错误")
 
     answer_image_path = None
     if standard_answer_image:
@@ -312,7 +312,7 @@ async def grade_existing(
         try:
             standard_answers = json.loads(standard_answers_json)
         except json.JSONDecodeError:
-            raise HTTPException(400, "标准答案 JSON 格式错误")
+            raise HTTPException(400, "参考答案 JSON 格式错误")
 
     answer_image_path = None
     if standard_answer_image:
@@ -505,7 +505,7 @@ def _run_grade_existing_pipeline(queue: asyncio.Queue, image_path: str,
 
             if prompt and prompt.get("answer_extraction_prompt"):
                 try:
-                    on_progress("extracting", "正在从答案图片提取标准答案...")
+                    on_progress("extracting", "正在从答案图片提取参考答案...")
                     extracted = call_ai_extract_answers(
                         answer_image_path, prompt["answer_extraction_prompt"],
                         on_progress=on_progress
@@ -517,7 +517,7 @@ def _run_grade_existing_pipeline(queue: asyncio.Queue, image_path: str,
                                 "correct_answer": a.get("answer", ""),
                                 "section_hint": a.get("section_hint", ""),
                             })
-                    on_progress("extraction_done", f"答案提取完成，共 {len(standard_answers)} 条标准答案")
+                    on_progress("extraction_done", f"答案提取完成，共 {len(standard_answers)} 条参考答案")
                 except Exception as e:
                     on_progress("warning", f"答案图片提取失败：{e}")
 

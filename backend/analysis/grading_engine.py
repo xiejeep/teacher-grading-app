@@ -11,7 +11,7 @@ from backend.config import API_URL, API_KEY, EP_ID
 def call_ai_extract_answers(image_path: str, prompt_text: str,
                             on_progress=None) -> dict:
     if on_progress:
-        on_progress("extracting", "正在从答案图片中提取标准答案...")
+        on_progress("extracting", "正在从答案图片中提取参考答案...")
 
     img = Image.open(image_path)
     img_w, img_h = img.size
@@ -31,7 +31,7 @@ def call_ai_extract_answers(image_path: str, prompt_text: str,
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "请提取这张答案图片中的所有标准答案信息。"},
+                    {"type": "text", "text": "请提取这张答案图片中的所有参考答案信息。"},
                     {
                         "type": "image_url",
                         "image_url": {
@@ -69,7 +69,7 @@ def call_ai_extract_answers(image_path: str, prompt_text: str,
     print(f"  [答案提取] Token: in {usage.get('prompt_tokens', '?')}, out {usage.get('completion_tokens', '?')}")
 
     if on_progress:
-        on_progress("extraction_done", f"提取到 {len(result['answers'])} 条标准答案",
+        on_progress("extraction_done", f"提取到 {len(result['answers'])} 条参考答案",
                     {"answers_count": len(result["answers"])})
 
     return result
@@ -78,11 +78,11 @@ def call_ai_extract_answers(image_path: str, prompt_text: str,
 def call_ai_extract_answers_from_text(answer_text: str, layout: dict,
                                       on_progress=None) -> dict:
     if on_progress:
-        on_progress("extracting", "正在从文本中提取标准答案...")
+        on_progress("extracting", "正在从文本中提取参考答案...")
 
     layout_json = json.dumps(layout, ensure_ascii=False)
     system_prompt = (
-        "你是一个试卷答案解析助手。教师提供了一段包含标准答案的文本，"
+        "你是一个试卷答案解析助手。教师提供了一段包含参考答案的文本，"
         "以及试卷的版面结构信息（JSON格式，包含 sections > problems 的题目框架）。\n\n"
         "请根据版面结构中的题号信息，将文本中的答案匹配到对应的题目上。\n\n"
         "输出JSON格式：\n"
@@ -97,7 +97,7 @@ def call_ai_extract_answers_from_text(answer_text: str, layout: dict,
     user_text = (
         f"试卷版面结构：\n{layout_json}\n\n"
         f"教师提供的答案文本：\n{answer_text}\n\n"
-        f"请提取所有标准答案，匹配到版面结构中的题目。"
+        f"请提取所有参考答案，匹配到版面结构中的题目。"
     )
 
     payload = {
@@ -134,7 +134,7 @@ def call_ai_extract_answers_from_text(answer_text: str, layout: dict,
     print(f"  [文本答案提取] Token: in {usage.get('prompt_tokens', '?')}, out {usage.get('completion_tokens', '?')}")
 
     if on_progress:
-        on_progress("extraction_done", f"提取到 {len(result['answers'])} 条标准答案",
+        on_progress("extraction_done", f"提取到 {len(result['answers'])} 条参考答案",
                      {"answers_count": len(result["answers"])})
 
     return result
@@ -142,9 +142,9 @@ def call_ai_extract_answers_from_text(answer_text: str, layout: dict,
 
 def build_standard_answers_section(standard_answers: list[dict] | None) -> str:
     if not standard_answers:
-        return "（本次批改未提供标准答案，请根据题目内容和常识判断学生作答是否正确）"
+        return "（本次批改未提供参考答案，请根据题目内容和常识判断学生作答是否正确）"
 
-    lines = ["以下是教师提供的标准答案："]
+    lines = ["以下是教师提供的参考答案："]
     for a in standard_answers:
         hint = f" ({a.get('section_hint', '')})" if a.get('section_hint') else ""
         lines.append(f"  - 题号 {a.get('problem_key', '?')}: {a.get('correct_answer', '?')}{hint}")
@@ -189,7 +189,7 @@ def call_ai_grade(image_path: str, layout: dict, grading_prompt: str,
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "请批改这张学生试卷，对照标准答案逐题判断对错，输出详细的批改结果 JSON。"},
+                    {"type": "text", "text": "请批改这张学生试卷，对照参考答案逐题判断对错，输出详细的批改结果 JSON。"},
                     {
                         "type": "image_url",
                         "image_url": {

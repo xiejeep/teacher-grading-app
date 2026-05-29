@@ -63,7 +63,7 @@
             placeholder="用于批改学生答卷的系统提示词"
           />
           <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-            可使用 {"{standard_answers_section}"} 插入标准答案、{"{layout_json}"} 插入版面数据、{"{subject}"} 替换为学科。
+            可使用 {"{standard_answers_section}"} 插入参考答案、{"{layout_json}"} 插入版面数据、{"{subject}"} 替换为学科。
           </div>
         </el-form-item>
         <el-form-item label="答案提取提示词">
@@ -71,7 +71,7 @@
             v-model="editForm.answer_extraction_prompt"
             type="textarea"
             :rows="6"
-            placeholder="用于从答案图片中提取标准答案的提示词"
+            placeholder="用于从答案图片中提取参考答案的提示词"
           />
         </el-form-item>
       </el-form>

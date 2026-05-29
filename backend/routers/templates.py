@@ -101,7 +101,7 @@ def _run_create_template_pipeline(queue: asyncio.Queue, image_path: str,
 
             if prompt and prompt.get("answer_extraction_prompt"):
                 try:
-                    on_progress("extracting", "正在从答案图片提取标准答案...")
+                    on_progress("extracting", "正在从答案图片提取参考答案...")
                     extracted = call_ai_extract_answers(
                         answer_image_path, prompt["answer_extraction_prompt"],
                         on_progress=on_progress
@@ -113,7 +113,7 @@ def _run_create_template_pipeline(queue: asyncio.Queue, image_path: str,
                                 "correct_answer": a.get("answer", ""),
                                 "section_hint": a.get("section_hint", ""),
                             })
-                    on_progress("extraction_done", f"答案提取完成，共 {len(standard_answers)} 条标准答案")
+                    on_progress("extraction_done", f"答案提取完成，共 {len(standard_answers)} 条参考答案")
                 except Exception as e:
                     on_progress("warning", f"答案图片提取失败：{e}")
 
@@ -271,7 +271,7 @@ def _run_extract_answers_pipeline(queue: asyncio.Queue, template_id: str,
 
         if answer_image_path:
             if prompt and prompt.get("answer_extraction_prompt"):
-                on_progress("extracting", "正在从答案图片提取标准答案...")
+                on_progress("extracting", "正在从答案图片提取参考答案...")
                 extracted = call_ai_extract_answers(
                     answer_image_path, prompt["answer_extraction_prompt"],
                     on_progress=on_progress,
@@ -286,7 +286,7 @@ def _run_extract_answers_pipeline(queue: asyncio.Queue, template_id: str,
                 on_progress("warning", "未找到对应学科的答案提取提示词，跳过图片提取")
 
         if answer_text and answer_text.strip():
-            on_progress("extracting_text", "正在从文本解析标准答案...")
+            on_progress("extracting_text", "正在从文本解析参考答案...")
             extracted = call_ai_extract_answers_from_text(
                 answer_text.strip(), layout, on_progress=on_progress,
             )
