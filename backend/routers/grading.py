@@ -627,7 +627,7 @@ def _run_grade_with_template_pipeline(
                          f"正在批改第 {student_index}/{total} 份: {original_name}",
                          {"student_index": student_index, "total_students": total})
 
-            student_run_id = uuid.uuid4().hex[:12]
+            student_run_id = simg["run_id"]
             save_result(student_run_id, simg["original_filename"], simg["image_path"],
                         layout_dict, simg["img_w"], simg["img_h"])
 
@@ -732,6 +732,7 @@ async def grade_with_template_stream(
             wf.write(contents)
         img = Image.open(image_path)
         student_images.append({
+            "run_id": student_run_id,
             "image_path": image_path,
             "original_filename": f.filename or filename,
             "img_w": img.size[0],
