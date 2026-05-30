@@ -50,9 +50,22 @@ function collectGradingIcons(
     return icons
   }
 
+  const titleToFirstIdx = new Map<string, number>()
+  analysis.sections.forEach((s, i) => {
+    if (!titleToFirstIdx.has(s.title || '')) titleToFirstIdx.set(s.title || '', i)
+  })
+
   for (const section of grading.sections) {
+    const origIdx = section._orig_section_idx
+    let si: number | undefined
+    if (origIdx != null && origIdx < analysis.sections.length) {
+      si = origIdx
+    } else {
+      si = titleToFirstIdx.get(section.title || '')
+    }
+    if (si == null) continue
+
     for (const problem of section.problems) {
-      const si = section._orig_section_idx ?? (section.section_number - 1)
       const pi = problem.problem_number - 1
       const analysisSection = analysis.sections[si]
       if (!analysisSection) continue
@@ -217,6 +230,58 @@ export async function toPngBlob(sections: AnalysisResponse['sections'], imgW: nu
     ctx.strokeStyle = '#e53935'
     ctx.lineWidth = 2
     ctx.strokeRect(x, y, w, h)
+  }
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((b) => {
+      if (b) resolve(b)
+      else reject(new Error('Canvas toBlob failed'))
+    }, 'image/png')
+  })
+}
+
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('Failed to load image'))
+    img.src = url
+  })
+}
+
+export async function compositeGradingToPngBlob(
+  imageUrl: string,
+  analysis: AnalysisResponse,
+  grading: GradingResult | null,
+  imgW: number,
+  imgH: number,
+): Promise<Blob> {
+  const img = await loadImage(imageUrl)
+  const canvas = document.createElement('canvas')
+  canvas.width = imgW
+  canvas.height = imgH
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvas not supported')
+
+  ctx.drawImage(img, 0, 0, imgW, imgH)
+
+  const icons = collectGradingIcons(analysis, grading, imgW, imgH)
+
+  for (const icon of icons) {
+    const half = icon.size / 2
+    const color = icon.isCorrect ? GREEN : RED
+    const pathData = icon.isCorrect ? CHECK_PATH : CROSS_PATH
+
+    ctx.save()
+    ctx.translate(icon.cx - half, icon.cy - half)
+    ctx.scale(icon.size / 1024, icon.size / 1024)
+
+    const p = new Path2D(pathData)
+    ctx.fillStyle = color
+    ctx.fill(p)
+
+    ctx.restore()
   }
 
   return new Promise<Blob>((resolve, reject) => {

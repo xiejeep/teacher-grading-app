@@ -65,13 +65,26 @@
       </el-collapse-item>
     </el-collapse>
 
-    <div style="margin-top: 16px; padding: 12px 16px; background: #f5f7fa; border-radius: 8px; text-align: center;">
+    <div style="margin-top: 16px; padding: 12px 16px; background: #f5f7fa; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
       <span style="font-size: 16px; font-weight: 600;">
         答对：
         <span :style="{ color: scorePercent >= 60 ? '#67C23A' : '#F56C6C' }">
           {{ displayResult.correct_count }} / {{ displayResult.total_areas }} 个作答区
         </span>
       </span>
+      <el-dropdown @command="handleExport">
+        <el-button size="small" :disabled="exporting">
+          {{ exporting ? '导出中...' : '导出标注' }}
+          <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+        </el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="svg">标注 (SVG)</el-dropdown-item>
+            <el-dropdown-item command="png">标注 (PNG)</el-dropdown-item>
+            <el-dropdown-item command="composite">标注+图片 (PNG)</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
     </div>
 
     <el-dialog v-model="dialogVisible" title="修正作答区" width="480px" append-to-body>
@@ -114,9 +127,11 @@
 
 <script setup lang="ts">
 import { ref, computed, reactive, watch } from 'vue'
-import { Document, CircleCheck, CircleClose, QuestionFilled } from '@element-plus/icons-vue'
+import { Document, CircleCheck, CircleClose, QuestionFilled, ArrowDown } from '@element-plus/icons-vue'
 import type { GradingResult, AnalysisResponse } from '@/types'
 import { updateGradingResult } from '@/api'
+import { gradingToSvgBlob, gradingToPngBlob, compositeGradingToPngBlob, downloadBlob } from '@/utils/exportAnnotations'
+import { ElMessage } from 'element-plus'
 
 const props = defineProps<{
   gradingResult: GradingResult
@@ -147,6 +162,34 @@ const scorePercent = computed(() => {
   if (!displayResult.total_areas) return 0
   return Math.round((displayResult.correct_count / displayResult.total_areas) * 100)
 })
+
+const exporting = ref(false)
+
+async function handleExport(format: string) {
+  if (!props.analysisResult || !props.gradingResult) return
+  const imgW = props.analysisResult.image_width
+  const imgH = props.analysisResult.image_height
+  const imageUrl = props.analysisResult.original_image_url
+  const suffix = props.gradingId || 'export'
+  exporting.value = true
+  try {
+    if (format === 'svg') {
+      const blob = gradingToSvgBlob(props.analysisResult, props.gradingResult, imgW, imgH)
+      downloadBlob(blob, `grading_${suffix}.svg`)
+    } else if (format === 'png') {
+      const blob = await gradingToPngBlob(props.analysisResult, props.gradingResult, imgW, imgH)
+      downloadBlob(blob, `grading_${suffix}.png`)
+    } else if (format === 'composite') {
+      const blob = await compositeGradingToPngBlob(imageUrl, props.analysisResult, props.gradingResult, imgW, imgH)
+      downloadBlob(blob, `graded_${suffix}.png`)
+    }
+    ElMessage.success('导出成功')
+  } catch {
+    ElMessage.error('导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
 
 const dialogVisible = ref(false)
 const editForm = ref<{
