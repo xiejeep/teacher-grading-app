@@ -22,14 +22,14 @@
       </div>
       <div v-else class="upload-preview">
         <img :src="previewUrl" alt="预览" class="preview-image" />
-        <el-button
-          class="change-btn"
-          size="small"
-          type="primary"
-          @click.stop="clearPreview"
-        >
-          重新选择
-        </el-button>
+        <div class="preview-actions">
+          <el-button size="small" @click.stop="handleRotate">
+            <el-icon><Refresh /></el-icon>旋转
+          </el-button>
+          <el-button size="small" type="primary" @click.stop="clearPreview">
+            重新选择
+          </el-button>
+        </div>
       </div>
     </div>
   </div>
@@ -37,7 +37,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { UploadFilled } from '@element-plus/icons-vue'
+import { UploadFilled, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
 defineProps<{ analyzing?: boolean }>()
@@ -86,6 +86,19 @@ async function handleCompress(f: File) {
   }
 }
 
+async function handleRotate() {
+  if (!file.value) return
+  try {
+    const { rotateImage } = await import('@/utils/compressImage')
+    const rotated = await rotateImage(file.value)
+    file.value = rotated
+    previewUrl.value = URL.createObjectURL(rotated)
+    emit('analyze', rotated)
+  } catch (e: any) {
+    ElMessage.error(e.message || '旋转失败')
+  }
+}
+
 function clearPreview() {
   file.value = null
   previewUrl.value = null
@@ -106,9 +119,10 @@ function clearPreview() {
   object-fit: contain;
 }
 
-.change-btn {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
+.preview-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 8px;
 }
 </style>

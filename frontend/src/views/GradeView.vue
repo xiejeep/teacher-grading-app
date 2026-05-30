@@ -145,9 +145,14 @@
           </div>
           <div v-if="studentFiles.length > 0" class="batch-file-list">
             <div v-for="(f, i) in studentFiles" :key="i" class="batch-file-item">
-              <el-icon :size="16" color="#409eff"><PictureFilled /></el-icon>
-              <span class="batch-file-name">{{ f.name }}</span>
-              <span class="batch-file-size">{{ formatSize(f.size) }}</span>
+              <img v-if="previewUrls[i]" :src="previewUrls[i]" class="batch-file-thumb" />
+              <div class="batch-file-info">
+                <span class="batch-file-name">{{ f.name }}</span>
+                <span class="batch-file-size">{{ formatSize(f.size) }}</span>
+              </div>
+              <el-button text size="small" @click="rotateStudentFile(i)">
+                <el-icon><Refresh /></el-icon>
+              </el-button>
               <el-button text size="small" type="danger" @click="removeStudentFile(i)">
                 <el-icon><Delete /></el-icon>
               </el-button>
@@ -403,13 +408,14 @@
         </el-button>
       </template>
     </el-dialog>
+
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { PictureFilled, Close, Loading, Check, UploadFilled, Delete, ArrowDown, ArrowUp, Edit, EditPen, RefreshLeft } from '@element-plus/icons-vue'
+import { PictureFilled, Close, Loading, Check, UploadFilled, Delete, ArrowDown, ArrowUp, Edit, EditPen, RefreshLeft, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { connectGradeWithTemplateSSE, connectExtractAnswersSSE } from '@/utils/sse'
 import type { SSEHandlers } from '@/utils/sse'
@@ -458,6 +464,7 @@ const selectedTemplateItem = ref<TemplateListItem | null>(null)
 
 // Student files
 const studentFiles = ref<File[]>([])
+const previewUrls = ref<string[]>([])
 const multiInputRef = ref<HTMLInputElement | null>(null)
 
 // Batch grading state
@@ -577,7 +584,7 @@ function onTemplateSelect(tpl: TemplateListItem) {
 function backToSelectTemplate() {
   selectedTemplateId.value = null
   selectedTemplateItem.value = null
-  studentFiles.value = []
+  clearAllFiles()
   showTemplatePreview.value = false
   templatePreviewData.value = null
   analysisStore.clearResult()
@@ -805,13 +812,35 @@ async function addStudentFile(f: File) {
   try {
     const compressed = await compressImage(f)
     studentFiles.value.push(compressed)
+    previewUrls.value.push(URL.createObjectURL(compressed))
   } catch (e: any) {
     ElMessage.error(e.message || '图片处理失败')
   }
 }
 
 function removeStudentFile(index: number) {
+  URL.revokeObjectURL(previewUrls.value[index])
+  previewUrls.value.splice(index, 1)
   studentFiles.value.splice(index, 1)
+}
+
+function clearAllFiles() {
+  for (const url of previewUrls.value) URL.revokeObjectURL(url)
+  previewUrls.value = []
+  studentFiles.value = []
+}
+
+async function rotateStudentFile(index: number) {
+  const f = studentFiles.value[index]
+  try {
+    const { rotateImage } = await import('@/utils/compressImage')
+    const rotated = await rotateImage(f)
+    studentFiles.value[index] = rotated
+    URL.revokeObjectURL(previewUrls.value[index])
+    previewUrls.value[index] = URL.createObjectURL(rotated)
+  } catch (e: any) {
+    ElMessage.error(e.message || '旋转失败')
+  }
 }
 
 // ===== Batch grading =====
@@ -891,7 +920,7 @@ function continueGrading() {
   batchDetailStudent.value = null
   batchResults.value = []
   batchSummary.value = null
-  studentFiles.value = []
+  clearAllFiles()
   progressLog.value = []
   phase.value = 'upload-students'
 }
@@ -901,7 +930,7 @@ function resetAll() {
   phase.value = 'select-template'
   selectedTemplateId.value = null
   selectedTemplateItem.value = null
-  studentFiles.value = []
+  clearAllFiles()
   batchResults.value = []
   batchSummary.value = null
   batchDetailStudent.value = null
@@ -1192,7 +1221,22 @@ onMounted(() => {
   border-radius: 6px;
   font-size: 13px;
 }
-.batch-file-name { flex: 1; color: #303133; }
+.batch-file-thumb {
+  width: 72px;
+  height: 72px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 1px solid #e4e7ed;
+  flex-shrink: 0;
+}
+.batch-file-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.batch-file-name { color: #303133; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .batch-file-size { color: #909399; font-size: 12px; }
 
 /* Batch results */
